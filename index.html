@@ -205,12 +205,23 @@ details.more[open] summary::before{transform:rotate(45deg)}
 .err{display:none;margin-top:16px;padding:14px 16px;border-radius:var(--r-s);background:#fbe4de;color:#8a2a1c}
 .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
 
-/* согласие на cookie (появляется, только если подключена Метрика) */
-.cc{position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:50;max-width:520px;margin:0 auto;padding:16px 18px;border-radius:18px;background:#fff;box-shadow:0 10px 40px rgba(27,35,43,.18);font-size:14px;line-height:1.5}
-.cc a{text-decoration:underline}
-.cc .row{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
-.cc .btn{padding:10px 18px}
-.cc .btn.ghost{background:var(--soft);color:var(--ink)}
+/* согласие на cookie: показывается при первом визите; до ответа ничего не загружается */
+.cc{position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:50;max-width:560px;margin:0 auto;padding:20px;border-radius:20px;background:var(--ink);color:#fff;font-size:14px;line-height:1.5}
+.cc h3{font-size:20px;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+.cc p{color:#c9d1d9}
+.cc a{color:#fff;text-decoration:underline}
+.cc .opts{display:none;margin-top:14px;gap:8px}
+.cc.more .opts{display:grid}
+.cc .opt{display:grid;grid-template-columns:22px 1fr;gap:10px;align-items:start;padding:12px 14px;border-radius:14px;background:rgba(255,255,255,.08);cursor:pointer}
+.cc .opt input{width:20px;height:20px;margin-top:1px;accent-color:var(--blue)}
+.cc .opt b{display:block;color:#fff;font-weight:500}
+.cc .opt span{color:#aab4be}
+.cc .row{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.cc .btn{padding:11px 18px;font-size:15px}
+.cc .btn.ghost{background:rgba(255,255,255,.12);color:#fff}
+.cc .btn.ghost:hover{background:rgba(255,255,255,.2)}
+.cc .lnkbtn{background:none;border:0;color:#c9d1d9;text-decoration:underline;cursor:pointer;padding:11px 6px;font-size:15px}
+@media(max-width:520px){.cc{left:10px;right:10px;padding:18px}.cc .row .btn{flex:1 1 auto}}
 
 @media (prefers-reduced-motion:reduce){
   html{scroll-behavior:auto}
@@ -654,49 +665,88 @@ api = { prefill: function(o){
 }
 
 // ---- cookie ----
-// Сам сайт cookie не ставит. Если в настройках указан номер счётчика Метрики (metrika),
-// счётчик загружается только после согласия посетителя. Без номера баннера нет: спрашивать не о чем.
-var CC_KEY = 'cookie-consent';
-function ccGet(){ try { return localStorage.getItem(CC_KEY); } catch (e) { return null; } }
-function ccSet(v){ try { localStorage.setItem(CC_KEY, v); } catch (e) {} }
-function loadMetrika(id){
+// Правило: до ответа посетителя сайт не ставит ни одного cookie и не загружает ничего стороннего.
+// Сам сайт cookie не использует вообще. Единственный источник cookie — Яндекс Метрика (если в config.json задан metrika),
+// и она загружается только после «Принять» или включённой галочки «Статистика».
+// Окно показывается при первом визите всегда; ответ хранится год (с датой и версией текста), потом спрашиваем снова.
+// Сам ответ лежит в localStorage браузера: это не cookie и на сервер не отправляется.
+var CC_KEY = 'cookie-consent', CC_VER = 1, CC_DAYS = 365, CC_ID = null, ymLoaded = false;
+function ccGet(){
+  try {
+    var v = JSON.parse(localStorage.getItem(CC_KEY) || 'null');
+    if (!v || v.v !== CC_VER || !v.at || (Date.now() - Date.parse(v.at)) > CC_DAYS * 864e5) return null;
+    return v;
+  } catch (e) { return null; }
+}
+function ccSet(stats){ try { localStorage.setItem(CC_KEY, JSON.stringify({v: CC_VER, stats: !!stats, at: new Date().toISOString()})); } catch (e) {} }
+function hasMetrika(){ return /^\d{5,12}$/.test(String(CC_ID || '')); }
+function loadMetrika(){
+  if (ymLoaded || !hasMetrika()) return; ymLoaded = true;
   (function(m, e, t, r, i, k, a){ m[i] = m[i] || function(){ (m[i].a = m[i].a || []).push(arguments); }; m[i].l = 1 * new Date();
     k = e.createElement(t); a = e.getElementsByTagName(t)[0]; k.async = 1; k.src = r; a.parentNode.insertBefore(k, a);
   })(window, document, 'script', 'https://mc.yandex.ru/metrika/tag.js', 'ym');
-  ym(+id, 'init', {clickmap: true, trackLinks: true, accurateTrackBounce: true});
+  ym(+CC_ID, 'init', {clickmap: true, trackLinks: true, accurateTrackBounce: true});
 }
-function dropMetrikaCookies(){ // отзыв согласия: стираем cookie Метрики
+function dropMetrika(){ // отзыв согласия: стираем cookie и записи Метрики в браузере
   document.cookie.split(';').forEach(function(c){
-    var n = c.split('=')[0].trim();
-    if (/^_ym/.test(n)) [location.hostname, '.' + location.hostname].forEach(function(d){
-      document.cookie = n + '=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=' + d;
-    });
+    var n = c.split('=')[0].trim(); if (!/^_ym/.test(n)) return;
+    var host = location.hostname.split('.'), doms = ['', location.hostname, '.' + location.hostname];
+    for (var i = 1; i < host.length - 1; i++) doms.push('.' + host.slice(i).join('.'));
+    doms.forEach(function(d){ document.cookie = n + '=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/' + (d ? '; domain=' + d : ''); });
   });
+  try { Object.keys(localStorage).forEach(function(k){ if (/^_ym/.test(k)) localStorage.removeItem(k); }); } catch (e) {}
+  try { Object.keys(sessionStorage).forEach(function(k){ if (/^_ym/.test(k)) sessionStorage.removeItem(k); }); } catch (e) {}
 }
-function cookieBanner(id){
+function ccDecide(stats){
+  var was = ccGet(); ccSet(stats);
+  var b = document.getElementById('cc'); if (b) b.remove();
+  if (stats) loadMetrika();
+  else if (was && was.stats){ dropMetrika(); location.reload(); } // Метрика уже работала — выгружаем её перезагрузкой
+}
+function cookieBanner(){
   var old = document.getElementById('cc'); if (old) old.remove();
-  var b = el('div', 'cc'); b.id = 'cc'; b.setAttribute('role', 'region'); b.setAttribute('aria-label', 'Согласие на cookie');
-  var p = el('p', '', 'Мы хотим считать посещения сайта с помощью Яндекс Метрики, она использует cookie. Включим её, только если вы согласны. ');
-  var a = el('a', '', 'Подробнее'); a.href = 'privacy.html#cookie'; p.appendChild(a);
-  var row = el('div', 'row'), yes = el('button', 'btn', 'Согласен'), no = el('button', 'btn ghost', 'Отказаться');
-  yes.type = no.type = 'button';
-  yes.onclick = function(){ var was = ccGet(); ccSet('yes'); b.remove(); if (was !== 'yes') loadMetrika(id); };
-  no.onclick = function(){ var was = ccGet(); ccSet('no'); b.remove(); if (was === 'yes'){ dropMetrikaCookies(); location.reload(); } };
-  row.appendChild(yes); row.appendChild(no); b.appendChild(p); b.appendChild(row); document.body.appendChild(b);
+  var cur = ccGet();
+  var b = el('div', 'cc'); b.id = 'cc'; b.setAttribute('role', 'dialog'); b.setAttribute('aria-labelledby', 'cc-h');
+  var h = el('h3', '', 'Мы бережём ваши данные'); h.id = 'cc-h'; b.appendChild(h);
+  var p = el('p', '', hasMetrika()
+    ? 'Сайт работает без cookie. С вашего согласия мы включим Яндекс Метрику: она ставит cookie и считает посещения. Пока вы не ответили, ничего не собирается. '
+    : 'Сайт не ставит cookie и не собирает статистику. Если мы подключим статистику посещений, она заработает только с вашего согласия. ');
+  var a = el('a', '', 'Подробнее'); a.href = 'privacy.html#cookie'; p.appendChild(a); b.appendChild(p);
+  // настройки по категориям
+  var opts = el('div', 'opts');
+  var o1 = el('label', 'opt'), c1 = el('input'); c1.type = 'checkbox'; c1.checked = true; c1.disabled = true;
+  var t1 = el('span'); t1.appendChild(el('b', '', 'Необходимые')); t1.appendChild(document.createTextNode('Запоминают только ваш ответ в этом окне. Cookie не используются.'));
+  o1.appendChild(c1); o1.appendChild(t1); opts.appendChild(o1);
+  var o2 = el('label', 'opt'), c2 = el('input'); c2.type = 'checkbox'; c2.checked = !!(cur && cur.stats);
+  var t2 = el('span'); t2.appendChild(el('b', '', 'Статистика (Яндекс Метрика)')); t2.appendChild(document.createTextNode(hasMetrika() ? 'Cookie ООО «Яндекс» для подсчёта посещений. Данные хранятся в России.' : 'Сейчас на сайте не подключена. Ваш выбор сохранится на будущее.'));
+  o2.appendChild(c2); o2.appendChild(t2); opts.appendChild(o2);
+  b.appendChild(opts);
+  var row = el('div', 'row'), yes = el('button', 'btn', 'Принять все'), no = el('button', 'btn ghost', 'Только необходимые'), set = el('button', 'lnkbtn', 'Настроить');
+  yes.type = no.type = set.type = 'button';
+  yes.onclick = function(){ ccDecide(true); };
+  no.onclick = function(){ ccDecide(false); };
+  set.onclick = function(){
+    if (!b.classList.contains('more')){ b.classList.add('more'); set.textContent = 'Сохранить выбор'; c2.focus(); }
+    else ccDecide(c2.checked);
+  };
+  row.appendChild(yes); row.appendChild(no); row.appendChild(set); b.appendChild(row);
+  document.body.appendChild(b);
 }
 function initCookies(id){
-  if (!/^\d{5,12}$/.test(String(id || ''))) return;
+  CC_ID = id;
   var v = ccGet();
-  if (v === 'yes') loadMetrika(id); else if (v !== 'no') cookieBanner(id);
+  if (!v) cookieBanner(); else if (v.stats) loadMetrika();
   // в подвале ссылка, чтобы передумать в любой момент
-  var f = document.getElementById('foot-lnk'), s = el('button', 'cclink', 'Настройки cookie');
-  s.type = 'button'; s.onclick = function(){ cookieBanner(id); }; f.appendChild(s);
+  if (!document.getElementById('cc-set')){
+    var s = el('button', 'cclink', 'Настройки cookie'); s.id = 'cc-set';
+    s.type = 'button'; s.onclick = function(){ cookieBanner(); }; document.getElementById('foot-lnk').appendChild(s);
+  }
 }
 
 function getJson(u){ return fetch(u, {cache: 'no-cache'}).then(function(r){ if (!r.ok) throw new Error(u + ': ' + r.status); return r.json(); }); }
 getJson(WORKER_URL + '/config').catch(function(){ return getJson('config.json'); })
   .then(start)
-  .catch(function(e){ console.error(e); document.getElementById('rows').innerHTML = '<p class="note">Не удалось загрузить настройки сайта. Позвоните нам: +7 914 072-66-16.</p>'; });
+  .catch(function(e){ console.error(e); initCookies(null); document.getElementById('rows').innerHTML = '<p class="note">Не удалось загрузить настройки сайта. Позвоните нам: +7 914 072-66-16.</p>'; });
 </script>
 </body>
 </html>
