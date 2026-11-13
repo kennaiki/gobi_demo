@@ -67,6 +67,17 @@ label.f{display:grid;gap:4px;font-size:13px;color:var(--muted)}
 .msg{margin:8px 0;font-size:14px}.msg.err{color:var(--red)}.msg.good{color:var(--ok)}
 .hint{color:var(--muted);font-size:13px}
 .empty{color:var(--muted);padding:12px 0}
+/* допуслуги в ручной записи: на всю ширину формы, галочки сеткой */
+.row>.exbox{flex:1 1 100%}
+.exg{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:4px 16px}
+label.ex{display:grid;grid-template-columns:20px 1fr auto;align-items:center;gap:10px;min-height:40px;font-size:15px;color:var(--ink);cursor:pointer}
+label.ex input{width:18px;height:18px;min-height:0;padding:0;accent-color:var(--accent)}
+label.ex b{font-weight:500;white-space:nowrap}
+/* итоговые цены */
+.bk .price{margin-left:10px;font-weight:600;white-space:nowrap}
+.days{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.dsum{text-transform:none;font-weight:500;color:var(--muted);font-size:14px}
+#mtot{font-size:16px;color:var(--ink);font-weight:600;margin-top:6px}
 @media (max-width:760px){.layout{grid-template-columns:1fr;grid-template-areas:"top" "tabs" "main"}.tabs{flex-direction:row;margin-bottom:12px}.bk{grid-template-columns:60px 1fr}.acts{grid-column:1/-1;justify-content:flex-start}}
 /* === Скругления: единый стиль форм и кнопок === */
 button,a.btnlink{border-radius:999px}
@@ -174,32 +185,45 @@ function renderFilter(){
   var o = el('option', '', 'Все посты'); o.value = ''; s.appendChild(o);
   CFG.masters.forEach(function(m){ var x = el('option', '', m.name); x.value = m.id; s.appendChild(x); });
   s.onchange = renderBooks; $('rf').onclick = loadBooks;
+  s.style.display = CFG.masters.length < 2 ? 'none' : ''; // при одном посте фильтр не нужен
 }
 function loadBooks(){
   $('berr').textContent = '';
-  api('/admin/bookings').then(function(j){ BOOKS = j; renderBooks(); })
+  api('/admin/bookings').then(function(j){ BOOKS = j; renderBooks(); if (window.refreshManualTimes) window.refreshManualTimes(); })
     .catch(function(e){ $('berr').textContent = e.message; });
+}
+// итоговая цена записи: мойка по кузову + допуслуги (по текущему прайсу)
+function rub(n){ return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' ₽'; }
+function bookPrice(b){
+  function pr(name){ var s = CFG.services.filter(function(x){ return x.name === name; })[0], p = s && s.prices[b.level]; return p ? p.price : null; }
+  var base = pr(b.service); if (base == null) return null;
+  return (b.extras || []).reduce(function(t, n){ return t + (pr(n) || 0); }, base);
 }
 function renderBooks(){
   var box = $('books'); box.innerHTML = '';
   var nw = BOOKS.filter(function(b){ return b.status !== 'ok'; }).length;
   document.title = (nw ? '(' + nw + ') ' : '') + 'Панель администратора';
-  var f = $('fm').value, last = '', card = null, n = 0;
+  var f = $('fm').value, last = '', card = null, n = 0, dayHead = null, daySum = 0, dayCnt = 0;
   var today = new Date(); today.setDate(today.getDate() - 1);
+  function closeDay(){ if (dayHead) dayHead.lastChild.textContent = dayCnt + ' ' + (dayCnt % 10 === 1 && dayCnt % 100 !== 11 ? 'запись' : dayCnt % 10 >= 2 && dayCnt % 10 <= 4 && (dayCnt % 100 < 10 || dayCnt % 100 >= 20) ? 'записи' : 'записей') + ' · ' + rub(daySum); }
   BOOKS.filter(function(b){ return !f || b.master === f; }).forEach(function(b){
     n++;
     if (b.date !== last){
+      closeDay(); daySum = 0; dayCnt = 0;
       last = b.date;
       var d = new Date(b.date + 'T12:00:00');
-      box.appendChild(el('div', 'days', d.toLocaleDateString('ru-RU', {weekday: 'long', day: 'numeric', month: 'long'})));
+      dayHead = el('div', 'days'); dayHead.appendChild(el('span', '', d.toLocaleDateString('ru-RU', {weekday: 'long', day: 'numeric', month: 'long'}))); dayHead.appendChild(el('span', 'dsum'));
+      box.appendChild(dayHead);
       card = el('div', 'card'); box.appendChild(card);
     }
+    var price = bookPrice(b); dayCnt++; if (price != null) daySum += price;
     var row = el('div', 'bk');
     row.appendChild(el('div', 't', b.time || '—'));
     var mid = el('div');
     var l1 = el('div'); l1.appendChild(el('strong', '', b.name || 'Без имени'));
     var bd = el('span', 'badge ' + (b.status === 'ok' ? 'okb' : 'new'), b.status === 'ok' ? 'Подтверждена' : 'Новая'); l1.appendChild(bd);
     if (b.manual) l1.appendChild(el('span', 'badge', 'вручную'));
+    if (price != null) l1.appendChild(el('span', 'price', rub(price)));
     mid.appendChild(l1);
     // кузов, мойка и допуслуги; пост показываем, только если их несколько
     var l2 = el('small', '', [CFG.masters.length > 1 ? masterName(b.master) : '', b.level, b.service].filter(Boolean).join(', ') + (b.extras && b.extras.length ? ' + ' + b.extras.join(', ') : ''));
@@ -215,6 +239,7 @@ function renderBooks(){
     no.onclick = function(){ if (confirm('Отменить запись «' + (b.name || '') + '» на ' + b.date + ' ' + (b.time || '') + '? Время освободится на сайте.')) act(b.id, 'no'); };
     ac.appendChild(no); row.appendChild(ac); card.appendChild(row);
   });
+  closeDay();
   if (!n) box.appendChild(el('p', 'empty', 'Записей пока нет.'));
 }
 function act(id, a){ api('/admin/action', {id: id, act: a}).then(loadBooks).catch(function(e){ $('berr').textContent = e.message; }); }
@@ -222,29 +247,82 @@ function act(id, a){ api('/admin/action', {id: id, act: a}).then(loadBooks).catc
 function renderManual(){
   var f = $('mf'); f.innerHTML = '';
   function sel(label, id, opts){ var l = el('label', 'f', label), s = el('select'); s.id = id;
-    opts.forEach(function(o){ var x = el('option', '', o[1]); x.value = o[0]; s.appendChild(x); }); l.appendChild(s); f.appendChild(l); }
-  sel('Пост', 'mm', CFG.masters.map(function(m){ return [m.id, m.name]; }));
+    opts.forEach(function(o){ var x = el('option', '', o[1]); x.value = o[0]; s.appendChild(x); }); l.appendChild(s); f.appendChild(l); return l; }
+  // пост выбираем, только если их несколько; при одном посте поле скрыто
+  var ml = sel('Пост', 'mm', CFG.masters.map(function(m){ return [m.id, m.name]; }));
+  if (CFG.masters.length < 2) ml.style.display = 'none';
   sel('Кузов', 'ml', CFG.levels.map(function(l){ return [l, l]; }));
   sel('Услуга', 'ms', []);
+  function priceOf(v, lv){ var p = v.prices[lv]; return p ? p : null; }
   // мойки с ценой для выбранного кузова; допуслуги без минут сюда не попадают
   function fillSvc(){
-    var lv = $('ml').value, s = $('ms'); s.innerHTML = '';
-    CFG.services.forEach(function(v){ var p = v.prices[lv]; if (!p || !p.minutes) return;
+    var lv = $('ml').value, s = $('ms'), keep = s.value; s.innerHTML = '';
+    CFG.services.forEach(function(v){ var p = priceOf(v, lv); if (!p || !p.minutes) return;
       var x = el('option', '', v.name + ' (' + p.minutes + ' мин, ' + p.price + ' ₽)'); x.value = v.name; s.appendChild(x); });
+    s.value = keep; if (s.selectedIndex < 0) s.selectedIndex = 0;
   }
-  $('ml').onchange = fillSvc; fillSvc();
   var dl = el('label', 'f', 'Дата'), di = el('input'); di.type = 'date'; di.id = 'md'; di.required = true;
   var t = new Date(); di.value = t.getFullYear() + '-' + ('0' + (t.getMonth() + 1)).slice(-2) + '-' + ('0' + t.getDate()).slice(-2);
   dl.appendChild(di); f.appendChild(dl);
-  var times = []; for (var m = 8 * 60; m < 23 * 60; m += 30) times.push([('0' + Math.floor(m / 60)).slice(-2) + ':' + (m % 60 ? '30' : '00')]);
-  sel('Время', 'mt', times.map(function(x){ return [x[0], x[0]]; }));
+  sel('Время', 'mt', []);
+  // время — по графику поста на выбранный день, шагом в длительность мойки
+  function fillTimes(){
+    var s = $('mt'), keep = s.value; s.innerHTML = '';
+    var m = CFG.masters.filter(function(x){ return x.id === $('mm').value; })[0] || CFG.masters[0];
+    var d = new Date($('md').value + 'T12:00:00'), key = DAYS[(d.getDay() + 6) % 7];
+    var h = /^(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})$/.exec(String((m && m.hours && m.hours[key]) || '').trim());
+    var v = CFG.services.filter(function(x){ return x.name === $('ms').value; })[0], p = v && priceOf(v, $('ml').value);
+    var dur = p && p.minutes ? p.minutes : 60;
+    if (!h){ var o = el('option', '', 'Выходной'); o.value = ''; s.appendChild(o); s.disabled = true; return; }
+    s.disabled = false;
+    function hhmm(x){ return ('0' + Math.floor(x / 60)).slice(-2) + ':' + (x % 60 ? ('0' + x % 60).slice(-2) : '00'); }
+    // занятые получасы этого поста на эту дату — из списка записей
+    var taken = [];
+    BOOKS.forEach(function(b){ if (b.date === $('md').value && b.master === m.id) taken = taken.concat(b.cells || [b.time]); });
+    for (var x = +h[1] * 60 + +h[2]; x + dur <= +h[3] * 60 + +h[4]; x += dur){
+      var tt = hhmm(x), busy = false;
+      for (var c = x; c < x + dur; c += 30) if (taken.indexOf(hhmm(c)) >= 0) busy = true;
+      var op = el('option', '', tt + (busy ? ' — занято' : '')); op.value = tt; op.disabled = busy; s.appendChild(op);
+    }
+    s.value = keep; if (s.selectedIndex < 0 || s.options[s.selectedIndex].disabled){
+      var free = [].filter.call(s.options, function(o){ return !o.disabled; })[0]; s.value = free ? free.value : '';
+    }
+  }
+  window.refreshManualTimes = fillTimes;
+  // допуслуги: галочки с ценой для выбранного кузова
+  var exl = el('div', 'f exbox'); exl.appendChild(el('span', '', 'Доп. услуги'));
+  var exg = el('div', 'exg'); exg.id = 'mx'; exl.appendChild(exg);
+  var tot = el('p', 'hint'); tot.id = 'mtot'; exl.appendChild(tot); f.appendChild(exl);
+  function fillExtras(){
+    var lv = $('ml').value, on = [].map.call(exg.querySelectorAll('input:checked'), function(i){ return i.value; }); exg.innerHTML = '';
+    CFG.services.forEach(function(v){ var p = priceOf(v, lv); if (!p || p.minutes) return;
+      var lb = el('label', 'ex'), cb = el('input'); cb.type = 'checkbox'; cb.value = v.name; cb.checked = on.indexOf(v.name) >= 0; cb.onchange = total;
+      lb.appendChild(cb); lb.appendChild(el('span', '', v.name)); lb.appendChild(el('b', '', p.price + ' ₽')); exg.appendChild(lb); });
+    if (!exg.children.length) exl.style.display = 'none';
+  }
+  function chosen(){ return [].map.call(exg.querySelectorAll('input:checked'), function(i){ return i.value; }); }
+  function total(){
+    var lv = $('ml').value, sum = 0, v = CFG.services.filter(function(x){ return x.name === $('ms').value; })[0], p = v && priceOf(v, lv);
+    if (p) sum += p.price;
+    chosen().forEach(function(n){ var e = CFG.services.filter(function(x){ return x.name === n; })[0], q = e && priceOf(e, lv); if (q) sum += q.price; });
+    var n = chosen().length;
+    $('mtot').textContent = 'Итого: ' + String(sum).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' ₽' + (n ? ' (мойка и ' + n + ' доп.)' : '');
+  }
+  $('ml').onchange = function(){ fillSvc(); fillExtras(); fillTimes(); total(); };
+  $('ms').onchange = function(){ fillTimes(); total(); };
+  $('mm').onchange = fillTimes; di.onchange = fillTimes;
+  fillSvc(); fillExtras(); fillTimes(); total();
   var nl = el('label', 'f', 'Имя (необязательно)'), ni = el('input'); ni.id = 'mn'; nl.appendChild(ni); f.appendChild(nl);
   var pl = el('label', 'f', 'Телефон (необязательно)'), pi = el('input'); pi.id = 'mp'; pi.type = 'tel'; pl.appendChild(pi); f.appendChild(pl);
   var b = el('button', 'primary', 'Добавить'); b.type = 'submit'; f.appendChild(b);
   f.onsubmit = function(e){
     e.preventDefault(); var msg = $('mmsg'); msg.className = 'msg'; msg.textContent = '';
-    api('/admin/book', {master: $('mm').value, level: $('ml').value, service: $('ms').value, date: $('md').value, time: $('mt').value, name: $('mn').value, phone: $('mp').value})
-      .then(function(){ msg.className = 'msg good'; msg.textContent = 'Запись добавлена, время занято.'; $('mn').value = ''; $('mp').value = ''; loadBooks(); })
+    if (!$('mt').value){ msg.className = 'msg err'; msg.textContent = $('mt').disabled ? 'В этот день мойка не работает.' : 'На этот день всё занято.'; return; }
+    api('/admin/book', {master: $('mm').value, level: $('ml').value, service: $('ms').value, extras: chosen(), date: $('md').value, time: $('mt').value, name: $('mn').value, phone: $('mp').value})
+      .then(function(){
+        msg.className = 'msg good'; msg.textContent = 'Запись добавлена, время занято.';
+        $('mn').value = ''; $('mp').value = ''; [].forEach.call(exg.querySelectorAll('input:checked'), function(i){ i.checked = false; }); total(); loadBooks();
+      })
       .catch(function(err){ msg.className = 'msg err'; msg.textContent = err.message; });
   };
 }
