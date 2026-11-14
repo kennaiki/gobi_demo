@@ -87,6 +87,84 @@ select{-webkit-appearance:none;appearance:none;padding-right:36px;background:var
 select option{background:var(--card);color:var(--ink)}
 .card{border-radius:18px}
 .bk,.bk:first-child{padding:12px 14px;margin-bottom:8px;border:1px solid var(--line);border-radius:14px;background:var(--bg)}
+
+/* ===== Новый вид в стиле сайта: белые карточки на светло-сером, без линий, всё скруглено ===== */
+:root{--bg:#f4f6f8;--card:#ffffff;--soft:#f4f6f8;--deep:#e9edf1;--blue-soft:#e6eefc;--sand:#f0c987}
+body{font-size:15px;padding:28px 20px}
+h1,h2,.bk .t{font-family:Oswald,"Arial Narrow",sans-serif;font-weight:500;letter-spacing:.2px}
+h1{font-size:26px;line-height:1.1}
+h2{font-size:24px}
+.top{border-bottom:0;padding-bottom:0;margin-bottom:28px}
+.brand{display:flex;align-items:center;gap:12px}
+.brand i{width:42px;height:42px;border-radius:14px;background:var(--accent);color:#fff;display:grid;place-items:center;font:500 22px Oswald,sans-serif;font-style:normal;position:relative;flex:none}
+.brand i::after{content:"";position:absolute;right:-3px;top:-3px;width:12px;height:12px;border-radius:50%;background:var(--sand);border:2px solid var(--bg)}
+.brand small{color:var(--muted);font-size:13px}
+.card{border:0;border-radius:20px;padding:20px}
+.card h3{font-size:17px}
+/* кнопки: без рамок, мягкие подложки */
+button,a.btnlink{border:0;background:var(--card);font-weight:500;transition:background .15s,transform .15s}
+button:hover,a.btnlink:hover{background:var(--deep)}
+.card button,.card a.btnlink{background:var(--deep)}
+.card button:hover{background:#dde2e8}
+button.primary,.card button.primary{background:var(--accent);color:#fff}
+button.primary:hover,.card button.primary:hover{background:#2358bb}
+button.danger,.card button.danger{background:#fbe8e6;color:var(--red);border:0}
+button.danger:hover,.card button.danger:hover{background:#f6d5d1}
+.tabs button,.stabs button{background:transparent;transition:none}
+.tabs button:hover{background:var(--deep)}
+.tabs button.on,.tabs button.on:hover{background:var(--ink);color:#fff}
+/* поля: серые подложки без рамок, синий фокус */
+input,select{border:0;background-color:var(--soft)}
+input:focus,select:focus{outline:2px solid var(--accent);outline-offset:0}
+/* шапка списка: заголовок слева, управление справа */
+.lhead{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:32px 0 6px}
+.lhead h2{margin:0}
+.lctl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.lctl select{width:auto;min-width:180px;background-color:var(--card)}
+.upd{color:var(--muted);font-size:13px}
+.refresh{display:inline-flex;align-items:center;gap:8px;padding:9px 18px 9px 14px}
+.refresh svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.refresh.busy svg{animation:spin .8s linear infinite}
+.refresh:disabled{opacity:1}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* дни и записи */
+.days{text-transform:none;font-size:15px;margin:22px 4px 8px}
+.days > span:first-child{display:inline-block}
+.days > span:first-child::first-letter{text-transform:uppercase}
+.bk,.bk:first-child{border:0;background:var(--soft);border-radius:16px;padding:14px 16px;grid-template-columns:72px 1fr auto}
+.bk:last-child{margin-bottom:0}
+.bk .t{font-size:22px}
+.bk strong{font-weight:600;margin-right:4px}
+.bk small{display:block;margin-top:2px}
+.bk small + br{display:none}
+.bk a{display:inline-block;margin-top:4px;font-weight:500;text-decoration:none}
+.bk a:hover{text-decoration:underline}
+.badge{border:0;padding:2px 10px;font-weight:500;vertical-align:1px}
+.badge.okb{background:#e3f2e6;color:var(--ok)}
+.badge.new{background:#fbf1dc;color:var(--warn)}
+.badge:not(.okb):not(.new){background:var(--deep);color:var(--muted)}
+.bk .price{display:inline-block;margin-left:6px;padding:2px 10px;border-radius:999px;background:var(--blue-soft);color:var(--accent);font-weight:600}
+/* ручная запись */
+#mtot{display:inline-block;align-self:start;padding:8px 14px;border-radius:12px;background:#fbf1dc;font-size:16px}
+label.ex{border-radius:10px;padding:0 6px;margin:0 -6px}
+label.ex:hover{background:var(--soft)}
+.savebar{border-top:0;background:var(--bg)}
+.lvl{border:0;background:var(--soft)}
+.lvl input,.lvl select{background-color:var(--card)}
+@media (max-width:760px){
+  body{padding:18px 12px}
+  .lhead{align-items:flex-start}
+  .lctl{width:100%;justify-content:space-between}
+  .upd{order:3;width:100%}
+  .bk,.bk:first-child{grid-template-columns:56px 1fr;padding:12px;gap:8px 10px}
+  .bk .t{font-size:20px}
+  .tabs{position:static;background:var(--card);padding:4px;border-radius:999px;width:max-content;max-width:100%}
+  .tabs button{padding:9px 18px}
+  #pb > .card,#books .card{padding:12px}
+  .card{padding:16px}
+  .lctl{width:auto}
+  .upd{order:0;width:auto}
+}
 </style>
 </head>
 <body>
@@ -104,7 +182,7 @@ select option{background:var(--card);color:var(--ink)}
 
 <div id="app" style="display:none">
 <div class="layout">
-  <div class="top"><h1>Панель администратора</h1><div class="row" style="flex:0 0 auto;gap:8px;flex-wrap:nowrap"><a class="btnlink" href="index.html">На сайт</a><button id="out" type="button">Выйти</button></div></div>
+  <div class="top"><div class="brand"><i aria-hidden="true">Г</i><div><h1>Панель администратора</h1><small>Автомойка «Гоби»</small></div></div><div class="row" style="flex:0 0 auto;gap:8px;flex-wrap:nowrap"><a class="btnlink" href="index.html">На сайт</a><button id="out" type="button">Выйти</button></div></div>
   <div class="tabs"><button type="button" id="tb" class="on">Записи</button><button type="button" id="tc">Настройки</button></div>
 
   <div id="pb">
@@ -114,8 +192,8 @@ select option{background:var(--card);color:var(--ink)}
       <form id="mf" class="row" style="margin-top:8px"></form>
       <p class="msg" id="mmsg"></p>
     </div>
-    <div class="top"><h2 style="margin:0">Ближайшие записи</h2>
-      <div class="row" style="flex:0 1 320px"><select id="fm"></select><button id="rf" type="button">Обновить</button></div></div>
+    <div class="lhead"><h2>Ближайшие записи</h2>
+      <div class="lctl"><span class="upd" id="upd" aria-live="polite"></span><select id="fm" aria-label="Пост"></select><button id="rf" type="button" class="refresh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg>Обновить</button></div></div>
     <p class="msg err" id="berr"></p>
     <div id="books"></div>
   </div>
@@ -188,9 +266,13 @@ function renderFilter(){
   s.style.display = CFG.masters.length < 2 ? 'none' : ''; // при одном посте фильтр не нужен
 }
 function loadBooks(){
-  $('berr').textContent = '';
-  api('/admin/bookings').then(function(j){ BOOKS = j; renderBooks(); if (window.refreshManualTimes) window.refreshManualTimes(); })
-    .catch(function(e){ $('berr').textContent = e.message; });
+  $('berr').textContent = ''; $('rf').classList.add('busy'); $('rf').disabled = true;
+  api('/admin/bookings').then(function(j){
+      BOOKS = j; renderBooks(); if (window.refreshManualTimes) window.refreshManualTimes();
+      var n = new Date(); $('upd').textContent = 'Обновлено в ' + ('0' + n.getHours()).slice(-2) + ':' + ('0' + n.getMinutes()).slice(-2);
+    })
+    .catch(function(e){ $('berr').textContent = e.message; })
+    .then(function(){ $('rf').classList.remove('busy'); $('rf').disabled = false; });
 }
 // итоговая цена записи: мойка по кузову + допуслуги (по текущему прайсу)
 function rub(n){ return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' ₽'; }
@@ -258,7 +340,7 @@ function renderManual(){
   function fillSvc(){
     var lv = $('ml').value, s = $('ms'), keep = s.value; s.innerHTML = '';
     CFG.services.forEach(function(v){ var p = priceOf(v, lv); if (!p || !p.minutes) return;
-      var x = el('option', '', v.name + ' (' + p.minutes + ' мин, ' + p.price + ' ₽)'); x.value = v.name; s.appendChild(x); });
+      var x = el('option', '', v.name + ' — ' + p.price + ' ₽ · ' + p.minutes + ' мин'); x.value = v.name; s.appendChild(x); });
     s.value = keep; if (s.selectedIndex < 0) s.selectedIndex = 0;
   }
   var dl = el('label', 'f', 'Дата'), di = el('input'); di.type = 'date'; di.id = 'md'; di.required = true;
