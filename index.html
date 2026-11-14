@@ -78,7 +78,8 @@ nav a:hover{color:var(--ink)}
 .tabs button[aria-pressed="true"]{background:var(--ink);color:#fff}
 .hours{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px}
 .hour{border:0;font:500 18px var(--display);letter-spacing:.5px;padding:16px 0;border-radius:16px;text-align:center;background:transparent;color:#a9b3bd}
-.hour.busy,.hour.past{text-decoration:line-through}
+.hour.busy{text-decoration:line-through}
+.hour.past{color:#ccd3da;opacity:.7} /* прошедший час: бледный, без зачёркивания — не путать с занятым */
 .hour.wait{color:var(--mute);text-decoration:none}
 .hour.free{background:#fff;color:var(--blue);cursor:pointer;transition:transform .2s,background .2s,color .2s}
 .hour.free:hover,.hour.free:focus-visible{background:var(--blue);color:#fff;transform:translateY(-3px)}
@@ -186,6 +187,17 @@ details.more[open] summary::before{transform:rotate(45deg)}
 .sum small{display:block;color:var(--mute);font-size:13px}
 .sum b{font:500 30px/1 var(--display);white-space:nowrap}
 .dd{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+#f > *,#f .field > *{min-width:0} /* иначе сетка формы растягивается по ленте дней и лента не листается */
+#f{grid-template-columns:minmax(0,1fr)}
+.ddw{position:relative;min-width:0}
+.dd{scroll-behavior:smooth;cursor:grab}
+.dd.drag{cursor:grabbing;scroll-behavior:auto}
+.dd.drag button{pointer-events:none}
+.ddn{position:absolute;top:50%;transform:translateY(calc(-50% - 2px));z-index:2;width:38px;height:38px;border:0;border-radius:50%;background:var(--ink);color:#fff;display:grid;place-items:center;cursor:pointer;transition:background .2s}
+.ddn:hover{background:var(--blue)}
+.ddn[hidden]{display:none}
+.ddn svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.ddn.prev{left:-6px}.ddn.next{right:-6px}
 .dd button{flex:0 0 auto;border:0;cursor:pointer;background:var(--soft);border-radius:16px;padding:10px 14px;min-width:66px;font-size:13px;color:var(--mute);transition:background .2s}
 .dd button b{display:block;font:500 20px var(--display);color:var(--ink)}
 .dd button.on{background:var(--ink);color:#c9d1d9}
@@ -348,7 +360,7 @@ details.more[open] summary::before{transform:rotate(45deg)}
         <label><span class="lbl">Мойка</span><select name="service" id="svc"></select></label>
         <details class="more" id="more"><summary>Добавить услуги</summary><div class="ex" id="ex"></div></details>
         <p class="sum" id="sum"></p>
-        <div class="field"><span class="lbl">День</span><div class="dd" id="days"></div></div>
+        <div class="field"><span class="lbl">День</span><div class="ddw"><button class="ddn prev" type="button" id="dd-prev" aria-label="Предыдущие дни" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg></button><div class="dd" id="days"></div><button class="ddn next" type="button" id="dd-next" aria-label="Следующие дни" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg></button></div></div>
         <div class="field"><span class="lbl">Время</span><div id="times" aria-live="polite"></div></div>
         <label><span class="lbl">Имя</span><input name="name" required autocomplete="given-name" maxlength="40" placeholder="Как к вам обращаться"></label>
         <label><span class="lbl">Телефон</span><input name="phone" aria-describedby="phint" type="tel" inputmode="tel" required autocomplete="tel" maxlength="18" placeholder="+7 (___) ___-__-__" pattern="\+7 \(\d{3}\) \d{3}-\d{2}-\d{2}" title="Введите номер полностью: +7 (999) 123-45-67"><span class="hint" id="phint">Перезвоним, чтобы подтвердить время</span></label>
@@ -592,9 +604,33 @@ function renderDays(){
     b.setAttribute('aria-label', fullDate(x.d)); b.setAttribute('aria-pressed', selDate === x);
     b.onclick = function(){ pickDay(x); };
     box.appendChild(b);
-    if (selDate === x) setTimeout(function(){ box.scrollLeft = Math.max(0, b.offsetLeft - box.offsetLeft - 8); }, 0);
+    if (selDate === x) setTimeout(function(){ box.style.scrollBehavior = 'auto'; box.scrollLeft = Math.max(0, b.offsetLeft - box.offsetLeft - 48); box.style.scrollBehavior = ''; if (window.ddUpdate) window.ddUpdate(); }, 0);
   });
+  setTimeout(function(){ if (window.ddUpdate) window.ddUpdate(); }, 0);
 }
+// Лента дней: на компьютере листается стрелками, колёсиком мыши и перетаскиванием
+(function(){
+  var box = document.getElementById('days'), pv = document.getElementById('dd-prev'), nx = document.getElementById('dd-next');
+  function upd(){ var max = box.scrollWidth - box.clientWidth; pv.hidden = box.scrollLeft <= 4; nx.hidden = box.scrollLeft >= max - 4; }
+  function step(dir){ box.scrollBy({left: dir * Math.max(box.clientWidth * 0.8, 160), behavior: 'smooth'}); }
+  pv.onclick = function(){ step(-1); }; nx.onclick = function(){ step(1); };
+  box.addEventListener('scroll', upd, {passive: true}); window.addEventListener('resize', upd);
+  box.addEventListener('wheel', function(e){
+    if (box.scrollWidth <= box.clientWidth || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+    var max = box.scrollWidth - box.clientWidth;
+    if ((e.deltaY < 0 && box.scrollLeft <= 0) || (e.deltaY > 0 && box.scrollLeft >= max)) return; // у края — прокручиваем форму дальше
+    e.preventDefault(); box.style.scrollBehavior = 'auto'; box.scrollLeft += e.deltaY; box.style.scrollBehavior = '';
+  }, {passive: false});
+  var down = false, sx = 0, sl = 0, moved = false;
+  box.addEventListener('pointerdown', function(e){ if (e.pointerType !== 'mouse' || e.button !== 0) return; down = true; moved = false; sx = e.clientX; sl = box.scrollLeft; });
+  window.addEventListener('pointermove', function(e){
+    if (!down) return; var dx = e.clientX - sx;
+    if (!moved && Math.abs(dx) > 5){ moved = true; box.classList.add('drag'); }
+    if (moved) box.scrollLeft = sl - dx;
+  });
+  window.addEventListener('pointerup', function(){ if (!down) return; down = false; setTimeout(function(){ box.classList.remove('drag'); }, 0); });
+  window.ddUpdate = upd;
+})();
 function pickDay(x, keepTime){
   selDate = x; if (!keepTime) selTime = null;
   if (!x){ renderDays(); document.getElementById('times').textContent = 'Свободных дней в ближайшее время нет. Позвоните нам.'; return; }

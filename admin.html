@@ -164,6 +164,21 @@ label.ex:hover{background:var(--soft)}
   .card{padding:16px}
   .lctl{width:auto}
   .upd{order:0;width:auto}
+  /* шапка: заголовок и кнопки не вылезают за экран */
+  .top{flex-wrap:wrap;gap:12px}
+  h1{font-size:22px}
+  .brand i{width:38px;height:38px;font-size:20px}
+  .top .row{flex-wrap:wrap!important}
+  .top .row button,.top .row a.btnlink{padding:8px 16px;min-height:40px}
+}
+/* поля одной ширины во всех браузерах: Safari на iPhone растягивает поле даты по своей ширине и оно наезжает на соседнее */
+.row>*{min-width:0}
+input[type=date]{-webkit-appearance:none;appearance:none;display:block;min-width:0;max-width:100%;width:100%;text-align:left;line-height:24px}
+input[type=date]::-webkit-date-and-time-value{text-align:left;min-height:24px}
+@media (max-width:760px){
+  #mf > label.f{flex:1 1 calc(50% - 4px)}
+  #mf > .exbox,#mf > label.f:has(#mn),#mf > label.f:has(#mp){flex-basis:100%}
+  #mf > button{flex:1 1 100%}
 }
 </style>
 </head>
